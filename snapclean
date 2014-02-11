@@ -1,0 +1,111 @@
+#!/bin/bash
+
+#
+# snapclean
+#
+# 140211 cmh (cmh@db94.net)
+#
+# Purpose:	Clean up old snapshots, maintaining a certain number of versions
+#
+
+exec 2> /tmp/debug-snapclean
+set -x
+
+# Simple error checking - I must be root.
+if [[ $(id -ur) != 0 ]]
+then
+	echo "Error: Must be run as root."
+	exit 1
+fi
+
+# Functions
+function usage {
+	if [[ -n "$*" ]]
+	then
+		echo "Error: $*"
+		echo
+	fi
+	echo "usage: $0 {dataset} {versions}"
+	exit 1
+}
+
+function noise {
+	if ((NOISE))
+	then
+		echo "$*"
+	fi
+}
+
+# Set default options if this is an interactive tty
+if tty -s
+then
+	NOISE=1
+	SYSLOG=0
+else
+	NOISE=0
+	SYSLOG=1
+fi
+
+# options processing (overrides defaults above)
+while getopts ":qvnxl" opt
+do
+	case $opt in
+		q)	# Run quietly
+			NOISE=0;;
+		v)	# Run verbosely
+			NOISE=1;;
+		n)	# non-exec
+			EXEC=echo;;
+		x)	# execute
+			EXEC="";;
+		l)	# log to syslog
+			SYSLOG=1;;
+	esac
+done
+shift $((OPTIND-1))
+
+# First arg is the dataset to clean, second arg is the number of versions to keep.
+#  Both args are mandatory
+DATASET=$1
+VERSIONS=$2
+
+# Error checking - start simple with checking that versions is a number
+if [[ ! $VERSIONS =~ ^[[:digit:]]*$ ]]
+then
+	usage "Bad number of versions. ($VERSIONS)"
+fi
+
+# Check to make sure this is a valid dataset
+if ! /sbin/zfs list $DATASET > /dev/null
+then
+	usage "\"$DATASET\" is not a dataset."
+fi
+
+# List the snapshots for the dataset in reverse order,
+#  use "tail" to get a list of those outside the number of versions.
+# Notes on "zfs list" to get the list of snapshots:
+#  -t snapshot	Only shows snapshots
+#  -H		Skips printing the headers
+#  -o name	Outputs only the "name" column
+#  -S creation	Sorts in reverse order (capital S) on creation time
+#               NB: If the names don't sort right and multiple snapshots are
+#		    created in the same minute, it might have trouble determining
+#		    which snapshots are "oldest" as the granularity of creation
+#		    time seems to be only down to the minute.
+listopts="-t snapshot -H -o name -S creation"
+/sbin/zfs list $listopts -r $DATASET | tail -n +$((VERSIONS+1)) | while read snap
+do
+	# Say what I'm doing
+	noise "Deleting snapshot $snap"
+	# Delete the snapshot
+	if OUT=$($EXEC /sbin/zfs destroy $snap)
+	then
+		# syslog uses daemon.warn since FreeNAS doesn't log lower priorities.
+		((SYSLOG)) && /usr/bin/logger -t Snapclean -p daemon.warn "Deleted snapshot $snap"
+	else
+		# send error message to syslog
+		((SYSLOG)) && #/usr/bin/logger -t Snapclean -p daemon.err "Error deleting snapshot $snap"
+		echo "Error deleting snapshot $snap:"
+		echo "$OUT"
+	fi
+done

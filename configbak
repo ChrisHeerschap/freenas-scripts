@@ -1,0 +1,42 @@
+#!/bin/bash
+
+#
+# configbak
+#
+# 131120 cmh (cmh@db94.net)
+#
+# Purpose:	Take a backup of the FreeNAS config file
+#
+
+#exec 2> /tmp/debug-configbak
+#set -x
+
+# var defs
+DB=freenas-v1.db
+ACTIVE=/data/$DB
+BAKSET=sto/backup/config
+BAK=/mnt/$BAKSET/$DB
+VERSIONS=64
+
+# Check the active version
+actsum=$(cksum $ACTIVE)
+actsum=${actsum%% *}
+
+# Check the backup version
+#  Direct STDERR to null in case the file doesn't exist
+baksum=$(cksum $BAK 2> /dev/null)
+baksum=${baksum%% *}
+
+# See if the checksum changed
+if [[ $actsum != $baksum ]]
+then
+	# Overwrite the backup
+	cp $ACTIVE $BAK
+
+	# Create a new snapshot
+	zfs snapshot $BAKSET@$(date +%y%m%d-%H%M)
+
+	# Clean up the snapshots older than the number of VERSIONS to keep
+	${0%/*}/snapclean -lqx $BAKSET $VERSIONS
+
+fi
