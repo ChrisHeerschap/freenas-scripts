@@ -69,8 +69,16 @@ shift $((OPTIND-1))
 DATASET=$1
 VERSIONS=$2
 
+# Error out on null dataset
+if [[ -z $DATASET ]]
+then
+    usage "No dataset given."
+fi
+
 # Error checking - start simple with checking that versions is a number
-if [[ ! $VERSIONS =~ ^[[:digit:]]*$ ]]
+#  Do not use "*" after "[[:digit:]]" as this would match a null!
+#  "+" matches "one or more" - "*" is "zero or more"
+if [[ ! $VERSIONS =~ ^[[:digit:]]+$ ]]
 then
 	usage "Bad number of versions. ($VERSIONS)"
 fi
