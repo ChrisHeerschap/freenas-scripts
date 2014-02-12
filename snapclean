@@ -8,8 +8,8 @@
 # Purpose:	Clean up old snapshots, maintaining a certain number of versions
 #
 
-exec 2> /tmp/debug-snapclean
-set -x
+#exec 2> /tmp/debug-snapclean
+#set -x
 
 # Simple error checking - I must be root.
 if [[ $(id -ur) != 0 ]]
