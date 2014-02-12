@@ -18,6 +18,13 @@ BAKSET=sto/backup/config
 BAK=/mnt/$BAKSET/$DB
 VERSIONS=64
 
+# Make sure I can read the database
+if [[ ! -r $ACTIVE || ! -w $BAK ]]
+then
+    echo "Error: can't read $ACTIVE or write $BAK"
+    exit 1
+fi
+
 # Check the active version
 actsum=$(cksum $ACTIVE)
 actsum=${actsum%% *}
