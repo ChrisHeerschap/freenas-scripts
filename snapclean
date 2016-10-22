@@ -101,7 +101,7 @@ fi
 #		    which snapshots are "oldest" as the granularity of creation
 #		    time seems to be only down to the minute.
 listopts="-t snapshot -H -o name -S creation"
-/sbin/zfs list $listopts -r $DATASET | tail -n +$((VERSIONS+1)) | while read snap
+/sbin/zfs list $listopts -r $DATASET | tail -n +$((VERSIONS+1)) | tac | while read snap
 do
 	# Say what I'm doing
 	noise "Deleting snapshot $snap"
